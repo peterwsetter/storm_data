@@ -1,0 +1,73 @@
+---
+title: "Analysis of the Effects of Storms on Population Health"
+author: "Peter W Setter"
+date: "March 6, 2015"
+output: html_document
+---
+
+### Synopsis
+
+
+### Questions
+Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+
+Across the United States, which types of events have the greatest economic consequences?
+
+### Data Processing
+
+```{r, cache=TRUE}
+library(R.utils)
+library(dplyr)
+storm.data.url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+download.file(storm.data.url, destfile = "StormData.csv.bz2", method = "curl")
+Sys.time() # Time of downloading data
+bunzip2(filename = "StormData.csv.bz2")
+storm.data <- tbl_df(read.csv("StormData.csv", header=TRUE))
+```
+
+With the data load, our next steps will involve cleaning and tidying it. We'll start with several basic tasks:
+
+* Turn all the `EVTYPE` factors to lower case
+* Convert the `BGN_DATE` from a factor into `POSIXct` format
+* Create `prop.dmg`, which multiplies `PROPDMG` by `PROPDMGEXP` to give the property damage in dollars (This ensures the variable is in one column rather than two)
+* Create `crop.dmg`, which multiples `CROPDMG` by `CROPDMGEXP` to give the property damage in dollars (Again, isolating the variable to one column)
+* Selecting the columns of interest for this study -- date, state, injuries, fatalities, and damage costs -- while tidying the column names by changing them to lower case
+* Filtering the results for events in 1996 and later
+
+The final step was performed because the data prior to this date is (more complete)[https://class.coursera.org/repdata-012/forum/thread?thread_id=29#comment-28]. Given the size of storm.data, we will remove it to free up resources.
+
+```{r}
+storm.data2 <- storm.data %>%  
+        mutate(event = tolower(EVTYPE), 
+               date = mdy_hms(BGN_DATE),
+               prop.dmg = ifelse(PROPDMGEXP == 'K', PROPDMG*1000,
+                                  ifelse(PROPDMGEXP == 'M', PROPDMG*1e6,
+                                        ifelse(PROPDMGEXP == 'B', PROPDMG*1e9, 0))),
+               crop.dmg = ifelse(CROPDMGEXP == 'K', CROPDMG*1000,
+                                  ifelse(CROPDMGEXP == 'M', CROPDMG*1e6,
+                                        ifelse(CROPDMGEXP == 'B', CROPDMG*1e9, 0)))) %>% 
+        select(date, event, state = STATE, fatalities = FATALITIES, 
+               injuries = INJURIES, prop.dmg, crop.dmg) %>% 
+        filter(date > ymd('1995-12-31'))
+rm(storm.data)
+```
+
+Looking at the structure of `storm.data2` we see that there are many more events in the data set than the 48 mentioned in the documentation. 
+
+```{r}
+str(storm.data2)
+```
+
+The next task will be to clean the data by combing factors so they fall within the permitted categories. If the listing is unknown or difficult to determine, it will be placed in the category `other`.
+
+```{r}
+Combine.events <- function(event) {
+        
+}
+```
+
+If we examine the head of the data frame tbl, we notice that there are several entries that have the same `date`, `event`, and `state`. 
+
+Large events can affect sevearl parts of a state or multiple states. Each county or region may report separately. To best understand each event, we can group the data by `date`, `event`, and `state`, and then report the number of counties affected, the total property damage, the total crop damage, the total damage, total fatalities, and total injuries. We chose to group by state, because diaster relief is typically performed at the state level with potential federal support.
+
+### Results
