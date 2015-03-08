@@ -18,6 +18,7 @@ Across the United States, which types of events have the greatest economic conse
 ```{r, cache=TRUE}
 library(R.utils)
 library(dplyr)
+library(stringr)
 storm.data.url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
 download.file(storm.data.url, destfile = "StormData.csv.bz2", method = "curl")
 Sys.time() # Time of downloading data
@@ -25,7 +26,7 @@ bunzip2(filename = "StormData.csv.bz2")
 storm.data <- tbl_df(read.csv("StormData.csv", header=TRUE))
 ```
 
-With the data load, our next steps will involve cleaning and tidying it. We'll start with several basic tasks:
+With the data load, my next steps will involve cleaning and tidying it. I'll start with several basic tasks:
 
 * Turn all the `EVTYPE` factors to lower case
 * Convert the `BGN_DATE` from a factor into `POSIXct` format
@@ -58,16 +59,137 @@ Looking at the structure of `storm.data2` we see that there are many more events
 str(storm.data2)
 ```
 
-The next task will be to clean the data by combing factors so they fall within the permitted categories. If the listing is unknown or difficult to determine, it will be placed in the category `other`.
+The next task will be to clean the data by combing factors so they fall within the permitted categories. If the listing is unknown or difficult to determine, it will be placed in the category `other`. `Combine.events` is a function that returns a permitted event name based on on an `event`. By coupling `any` with `str_detect`, we can look for abbreviations and misspellings, e.g. "tstm" for "thunderstorm" and "wnd" for "wind".
+
+With the function defined, I utilize vapply to create a new column, `clean.event`, with each `event` properly classified. Please see this [StackOverflow post](http://stackoverflow.com/questions/9668456/why-does-sapply-return-a-list) for an explanation on the use of vapply.
 
 ```{r}
 Combine.events <- function(event) {
-        if(any(str_detect(event, c('tstm', 'thunderstorm')))) {
-                if(any(str_detect(event, c('wind', 'wnd')))) {
-                        return('thunderstorm.wind')
-                }
-        } else {
+        if(str_detect(event, 'marine')) {
                 
+        } else if (any(str_detect(event, 
+                        c('winter storm', 'ice storm', 'snow squall')))) {
+                return('winter.storm')
+        } else if(any(str_detect(event, 
+                        c('flurries', 'icy', 'mixed',
+                          'freezing', 'wintry')))) {
+                return('winter.weather')
+        } else if (str_detect(event, 'sleet')) {
+                return('sleet')
+        }
+        
+        else if (any(str_detect(event, 
+                        c('freeze', 'frost', 'glaze', 'black ice')))) {
+                return('frost.freeze')
+        } else if (str_detect(event, 'tropical')) {
+                if (str_detect(event, 'storm')) {
+                        return('tropical.storm')
+                } else {
+                        return('tropical.depression')
+                }
+        } else if (any(str_detect(event, c('hurricane', 'typhoon')))) {
+                return('hurricane.typhoon')
+        } else if (str_detect(event, 'surf')) {
+                return('high.surf')
+        }
+        
+        else if (str_detect(event, 'tornado')) {
+                return('tornado')       
+        } else if (str_detect(event, 'spout')) {
+                return('waterspout')
+        } else if (any(str_detect(event, c('funnel', 'whirl', 'wall')))) {
+                return('funnel.cloud')
+        }
+        
+        else if (str_detect(event, 'hail')) {
+                return('hail')
+        } 
+         else if (str_detect(event, 'snow')) {
+                if (any(str_detect(event, c('heavy', 'snow')))) {
+                        return('heavy.snow')
+                } else {
+                        return('winter.weather')
+                }
+        }
+        
+        else if (any(str_detect(event, c('flood', 'fld', 'beach', 'jam')))) {
+                if (any(str_detect(event, c('costal', 'cstl', 'tidal', 'beach')))) {
+                        return('costal.flood')
+                } else if (str_detect(event, 'flash')) {
+                        return('flash.flood')
+                } else if (str_detect(event, 'lake')) {
+                        return('lakeshore.flood')
+                } else {
+                        return('flood')
+                }
+        } else if (any(str_detect(event, c('mud', 'slump')))) {
+                return('debris.flow')
+        }
+        
+        else if (any(str_detect(event, c('freezing')))) {
+                return('winter.weather')
+        } else if (any(str_detect(event, c('cold', 'chill')))) {
+                if (any(str_detect(event, 
+                        c('extreme', 'record', 'excessive', 'extended')))) {
+                        return('extreme.cold.wind.chill')
+                } else {
+                        return('cold.wind.chill')
+                }
+        } else if (any(str_detect(event, c('heat', 'warm')))) {
+                if(any(str_detect(event, c('excessive', 'record')))) {
+                        return('excessive.heat')
+                } else {
+                        return('heat')
+                }
+        } else if (str_detect(event, 'light')) {
+                return(lightning)
+        } else if (str_detect(event, 'blizzard')) {
+                return('blizzard')
+        } else if (str_detect(event, 'avalanc')) {
+                return('avalanche')
+        }
+        
+        else if (str_detect(event, 'rip')) {
+                return('rip.current')
+        } else if (str_detect(event, 'surge')) {
+                return('storm.surge')
+        }
+        
+        else if (any(str_detect(event, c('drought', 'record dry', 'hot and dry')))) {
+                return(drought)
+        } else if (str_detect(event, 'fire')) {
+                return('wildfire')
+        } else if (str_detect(event, 'dust')) {
+                if (str_detect(event, 'devil')) {
+                        return('dust.devil')
+                } else {
+                        return('dust.storm')
+                }
+        }
+        
+        else if (any(str_detect(event, c('wind', 'wnd', 'burst')))) {
+                if(any(str_detect(event, c('tstm', 'thunderstorm', 'burst')))) {
+                        return('thunderstorm.wind')
+                } else if(str_detect(event, 'high') {
+                        return('high.wind')
+                } else {
+                        return('strong.wind')
+                } 
+        } else if (str_detect(event, 'fog')) {
+                if (any(str_detect(event, c('freezing', 'ice')))) {
+                        return('freezing.fog')
+                } else {
+                        return('dense.fog')
+                }
+        } else if (str_detect(event, 'volcan')) {
+                return('volcanic.ash')
+        } else if (any(str_detect(event, 
+                        c('rain', 'thunderstorms', 'coastal storm', 
+                          'wet month',
+                          'precipitaiton')))) {
+                return('heavy.rain')
+        } else if (any(str_detect(event, c('blow-out', 'astronomical low'))) {
+                return('astronomical.low.tide')
         }
 }
 
