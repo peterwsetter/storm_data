@@ -62,8 +62,16 @@ The next task will be to clean the data by combing factors so they fall within t
 
 ```{r}
 Combine.events <- function(event) {
-        
+        if(any(str_detect(event, c('tstm', 'thunderstorm')))) {
+                if(any(str_detect(event, c('wind', 'wnd')))) {
+                        return('thunderstorm.wind')
+                }
+        } else {
+                
+        }
 }
+
+vapply(storm.subset$event, Combine.events, character(1))
 ```
 
 If we examine the head of the data frame tbl, we notice that there are several entries that have the same `date`, `event`, and `state`. 
