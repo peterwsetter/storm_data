@@ -13,6 +13,9 @@ Across the United States, which types of events (as indicated in the EVTYPE vari
 
 Across the United States, which types of events have the greatest economic consequences?
 
+### Hardware and Software Used
+This analysis used a Macbook 2,1 running OSX 10.6.8 with a Intel Core 2 Duo processor and 2 GB of RAM. The software was R 3.1.2 run within RStudio Version 0.98.1087. 
+
 ### Data Processing
 
 ```{r, cache=TRUE}
@@ -61,27 +64,63 @@ str(storm.data2)
 
 The next task will be to clean the data by combing factors so they fall within the permitted categories. If the listing is unknown or difficult to determine, it will be placed in the category `other`. `Combine.events` is a function that returns a permitted event name based on on an `event`. By coupling `any` with `str_detect`, we can look for abbreviations and misspellings, e.g. "tstm" for "thunderstorm" and "wnd" for "wind".
 
-With the function defined, I utilize vapply to create a new column, `clean.event`, with each `event` properly classified. Please see this [StackOverflow post](http://stackoverflow.com/questions/9668456/why-does-sapply-return-a-list) for an explanation on the use of vapply.
+Overview on how labels were combined:
 
-```{r}
+* Marine events were classified first in order to avoid misclassification
+* Snow squalls were classified as `winter.storm`
+* Heavy or "record" snow was classified `heavy.snow`
+* All other snow events, along with other winter precipiation, were classified as `winter.weather`
+* "Glaze" and "black ice" were classified as `frost.freeze`
+* Remnants of hurricanes were classified as `tropical.depression`
+* Any event labeled with surf or sea was classified as `high.surf`
+* Whirlwinds and wall clouds were grouped within `funnel.cloud` since they are related weather events
+* Unless specificed as costal, lake, or flash, all any label containing "flood" was classified as a `flood`
+* As per the documentation, all land- and mudslides were classified as `debris.flow`
+* If a event labeled included "extreme", "record", "excessive", "extended", or "hypothermia", is was classified as `extreme.cold.wind.chill`
+* Other cold, chill, and cool events were classified as `cold.wind.chill`
+* Similarly, when "excessive" or "record" were coupled with a synonym for "hot", it was classified as `excessive.heat` otherwise it was simply `heat`
+* "Dry" and "low rain" were classified as `drought`
+* All fires were classified as `wildfire`
+
+With the function defined, I first create a data frame tbl called `storm.clean`. I utilize vapply to overwrite the `event` with each `event` properly classified. Please see this [StackOverflow post](http://stackoverflow.com/questions/9668456/why-does-sapply-return-a-list) for an explanation on the use of vapply. Last, the `event` column is transformed from `character`s into `factor`s.
+
+```{r, cache=TRUE}
 Combine.events <- function(event) {
         if(str_detect(event, 'marine')) {
-                
+                if (any(str_detect(event, c('tstm', 'thunderstorm')))) {
+                        return('marine.thunderstorm.wind')
+                } else if (str_detect(event, 'hail')) {
+                        return('marine.hail')
+                } else if (str_detect(event, 'high')) {
+                        return('marine.high.wind')
+                } else if (str_detect(event, 'strong')) {
+                        return('marine.strong.wind')
+                } else {
+                        return('other')
+                }
         } else if (any(str_detect(event, 
-                        c('winter storm', 'ice storm', 'snow squall')))) {
+                        c('winter storm', 'snow squall')))) {
                 return('winter.storm')
-        } else if(any(str_detect(event, 
-                        c('flurries', 'icy', 'mixed',
-                          'freezing', 'wintry')))) {
+        } else if (any(str_detect(event, c('flurries', 'icy', 'mixed', 'ic. road', 'freezing', 'wintry')))) {
                 return('winter.weather')
+        } else if (str_detect(event, 'ice storm')) {
+                return('ice.storm')      
         } else if (str_detect(event, 'sleet')) {
                 return('sleet')
-        }
-        
-        else if (any(str_detect(event, 
+        } else if (str_detect(event, 'snow')) {
+                if (any(str_detect(event, c('heavy', 'record')))) {
+                        return('heavy.snow')
+                } else if (str_detect(event, 'lake')) {
+                        return('lake.effect.snow')
+                } else {
+                        return('winter.weather')
+                }
+        } else if (str_detect(event, 'blizzard')) {
+                return('blizzard')
+        } else if (any(str_detect(event, 
                         c('freeze', 'frost', 'glaze', 'black ice')))) {
                 return('frost.freeze')
-        } else if (str_detect(event, 'tropical')) {
+        } else if (any(str_detect(event, c('tropical', 'remnant')))) {
                 if (str_detect(event, 'storm')) {
                         return('tropical.storm')
                 } else {
@@ -89,30 +128,19 @@ Combine.events <- function(event) {
                 }
         } else if (any(str_detect(event, c('hurricane', 'typhoon')))) {
                 return('hurricane.typhoon')
-        } else if (str_detect(event, 'surf')) {
+        } else if (any(str_detect(event, c('surf', 'sea')))) {
                 return('high.surf')
-        }
-        
-        else if (str_detect(event, 'tornado')) {
+        } else if (str_detect(event, 'tsunami')) {
+                return('tsunami')
+        } else if (str_detect(event, 'tornado')) {
                 return('tornado')       
         } else if (str_detect(event, 'spout')) {
                 return('waterspout')
         } else if (any(str_detect(event, c('funnel', 'whirl', 'wall')))) {
                 return('funnel.cloud')
-        }
-        
-        else if (str_detect(event, 'hail')) {
+        } else if (any(str_detect(event, c('hail', 'ice pellet')))) {
                 return('hail')
-        } 
-         else if (str_detect(event, 'snow')) {
-                if (any(str_detect(event, c('heavy', 'snow')))) {
-                        return('heavy.snow')
-                } else {
-                        return('winter.weather')
-                }
-        }
-        
-        else if (any(str_detect(event, c('flood', 'fld', 'beach', 'jam')))) {
+        } else if (any(str_detect(event, c('flood', 'fld', 'beach', 'jam')))) {
                 if (any(str_detect(event, c('costal', 'cstl', 'tidal', 'beach')))) {
                         return('costal.flood')
                 } else if (str_detect(event, 'flash')) {
@@ -122,82 +150,152 @@ Combine.events <- function(event) {
                 } else {
                         return('flood')
                 }
-        } else if (any(str_detect(event, c('mud', 'slump')))) {
+        } else if (any(str_detect(event, c('slide', 'slump')))) {
                 return('debris.flow')
-        }
-        
-        else if (any(str_detect(event, c('freezing')))) {
-                return('winter.weather')
-        } else if (any(str_detect(event, c('cold', 'chill')))) {
+        } else if (any(str_detect(event, c('cold', 'chill', 'cool')))) {
                 if (any(str_detect(event, 
-                        c('extreme', 'record', 'excessive', 'extended')))) {
+                        c('extreme', 'record', 'excessive', 
+                          'extended', 'thermia')))) {
                         return('extreme.cold.wind.chill')
                 } else {
                         return('cold.wind.chill')
                 }
-        } else if (any(str_detect(event, c('heat', 'warm')))) {
+        } else if (any(str_detect(event, c('heat', 'warm', 'high temp', 'hot')))) {
                 if(any(str_detect(event, c('excessive', 'record')))) {
                         return('excessive.heat')
                 } else {
                         return('heat')
                 }
-        } else if (str_detect(event, 'light')) {
-                return(lightning)
-        } else if (str_detect(event, 'blizzard')) {
-                return('blizzard')
+        } else if (any(str_detect(event, c('lightning','lighting')))) {
+                return('lightning')
         } else if (str_detect(event, 'avalanc')) {
                 return('avalanche')
-        }
-        
-        else if (str_detect(event, 'rip')) {
+        } else if (str_detect(event, 'rip')) {
                 return('rip.current')
         } else if (str_detect(event, 'surge')) {
                 return('storm.surge')
-        }
-        
-        else if (any(str_detect(event, c('drought', 'record dry', 'hot and dry')))) {
-                return(drought)
+        } else if (any(str_detect(event, 
+                        c('drought', 'record dry', 'hot and dry', 
+                          'dry spell', 'low rain')))) {
+                return('drought')
         } else if (str_detect(event, 'fire')) {
                 return('wildfire')
         } else if (str_detect(event, 'dust')) {
-                if (str_detect(event, 'devil')) {
+                if (str_detect(event, 'dev.l')) {
                         return('dust.devil')
                 } else {
                         return('dust.storm')
                 }
-        }
-        
-        else if (any(str_detect(event, c('wind', 'wnd', 'burst')))) {
-                if(any(str_detect(event, c('tstm', 'thunderstorm', 'burst')))) {
+        } else if (any(str_detect(event, c('wind', 'wnd', 'burst')))) {
+                if(any(str_detect(event, c('tstm', 'thunderstorm', 'burst')))
+                   & !str_detect(event, 'non')) {
                         return('thunderstorm.wind')
-                } else if(str_detect(event, 'high') {
+                } else if (str_detect(event, 'high')) {
                         return('high.wind')
                 } else {
                         return('strong.wind')
                 } 
-        } else if (str_detect(event, 'fog')) {
+        } else if (any(str_detect(event, c('fog', 'vog')))) {
                 if (any(str_detect(event, c('freezing', 'ice')))) {
                         return('freezing.fog')
                 } else {
                         return('dense.fog')
                 }
+        } else if (str_detect(event, 'smoke')) {
+                return('dense.smoke')
         } else if (str_detect(event, 'volcan')) {
                 return('volcanic.ash')
         } else if (any(str_detect(event, 
                         c('rain', 'thunderstorms', 'coastal storm', 
-                          'wet month',
-                          'precipitaiton')))) {
+                          'wet', 'tstm', 'precipitaiton')))) {
                 return('heavy.rain')
-        } else if (any(str_detect(event, c('blow-out', 'astronomical low'))) {
+        } else if (any(str_detect(event, c('blow-out', 'astronomical low')))) {
                 return('astronomical.low.tide')
+        } else if (any(str_detect(event, c('swell', 'seiche', 'wave')))) {
+                return('seiche')
+        } else {
+                return('other')
         }
 }
 
-vapply(storm.subset$event, Combine.events, character(1))
+storm.clean <- storm.data2
+storm.clean$event <- vapply(storm.clean$event, Combine.events, character(1))
+storm.clean$event <- as.factor(storm.clean$event)
 ```
 
-If we examine the head of the data frame tbl, we notice that there are several entries that have the same `date`, `event`, and `state`. 
+If we examine the head of the data frame tbl, I notice that there are several entries that have the same `date`, `event`, and `state`. (Also, since storm.data2 is no longer needed, it is removed to free up space.)
 
-Large events can affect sevearl parts of a state or multiple states. Each county or region may report separately. To best understand each event, we can group the data by `date`, `event`, and `state`, and then report the number of counties affected, the total property damage, the total crop damage, the total damage, total fatalities, and total injuries. We chose to group by state, because diaster relief is typically performed at the state level with potential federal support.
+```{r}
+rm(storm.data2)
+head(storm.clean)
+```
+
+Large events can affect sevearl parts of a state or multiple states. Each county or region may report separately. To best understand each event, I can group the data by `date`, `event`, and `state`, and then report the the total property damage, the total crop damage, the total damage, total fatalities, and total injuries. I chose to group by state, because diaster relief is typically performed at the state level with potential federal support. The resulting data frame tbl is called `storm.group`.
+
+```{r}
+storm.group <- storm.clean %>% 
+        group_by(date, event, state) %>% 
+        summarize(all.fatalities = sum(fatalities),
+                  all.injuries = sum(injuries),
+                  all.prop.dmg = sum(prop.dmg),
+                  all.crop.dmg = sum(crop.dmg),
+                  all.dmg = all.prop.dmg + all.crop.dmg)
+
+reported.events <- nrow(storm.clean)
+grouped.events <- nrow(storm.group)
+```
+
+There are `r reported.events` events recorded in the data set, but after grouping, I see there are `r grouped.events`. If events were grouped by neighboring state, this figure would likely decrease even more.
 
 ### Results
+With the data throughly cleaned and tidyed, I begin the analysis by identifying the weather events that are the most hazardous to human health. It is done by summing the injuries and fatalities. In addition, I will count the number of events.
+
+```{r}
+hazard.health <- storm.group %>%
+        group_by(event) %>%
+        summarize(total.fatalities = sum(all.fatalities),
+                  total.injuries = sum(all.injuries),
+                  count = n(),
+                  fatalities.per.event = round(total.fatalities/count, 1),
+                  injuries.per.event = round(total.injuries/count), 1) %>%
+        arrange(desc(fatalities.per.event))
+
+head(hazard.health, 5)
+```
+
+Looking at the events that cause the most loss of life, the top five are
+
+1. Tsunami
+2. Excessive Heat
+3. Rip Currents
+4. Hurricanes
+5. Avalanche
+
+I note that tsunamis were infrequent, only 10 recorded in the 21 years of the data set. Excessive heat and rip current were both deadly and common.
+
+I can arrange the table and consider the number of injuries per event.
+
+```{r}
+head(arrange(hazard.health, desc(injuries.per.event)), 5)
+```
+
+As before, tsunamis have the greatest impact on human health, and heat, in its two designations, are placed similar to before. Under this metric, the effect of hurricanes and tornados are seen.
+
+Turning my attention to the damage caused by storms, I can perform an opperation like that before. I create a new data frame tbl `most.cost`, which summarizes the total property, crop, and overall damage.
+
+```{r}
+most.cost <- storm.group %>%
+        group_by(event) %>%
+        summarize(total.prop.dmg = sum(all.prop.dmg),
+                  total.crop.dmg = sum(all.crop.dmg),
+                  count = n(),
+                  prop.dmg.per.event = round(total.prop.dmg/count, 1),
+                  crop.dmg.per.event = round(total.crop.dmg/count, 1),
+                  total.cost.per.event = prop.dmg.per.event + crop.dmg.per.event) %>%
+        arrange(desc(total.cost.per.event)) %>%
+        select(event, total.cost.per.event, count, 2, 3, 5, 6)
+
+head(most.cost, 5)
+```
+
+Hurricanes and storm surges rank highest and are an order of magnitude greater in their total cost per event. Tropical storms add to the cost of extreme ocean storms. Tsunamis are also ranked high. Floods rank fifth, but are approximately 50 times more common than hurricanes, storm surge, and tropical storms. 
