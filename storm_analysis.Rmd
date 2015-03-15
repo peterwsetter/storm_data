@@ -2,7 +2,9 @@
 title: "Analysis of the Effects of Storms on Population Health"
 author: "Peter W Setter"
 date: "March 6, 2015"
-output: html_document
+output:
+  html_document:
+    keep_md: yes
 ---
 
 ### Synopsis
@@ -17,15 +19,21 @@ Across the United States, which types of events have the greatest economic conse
 This analysis used a Macbook 2,1 running OSX 10.6.8 with a Intel Core 2 Duo processor and 2 GB of RAM. The software was R 3.1.2 run within RStudio Version 0.98.1087. 
 
 ### Data Processing
-
-```{r, cache=TRUE}
+```{r}
 library(R.utils)
 library(dplyr)
+library(lubridate)
 library(stringr)
+library(choroplethr)
+library(datasets)
+```
+
+```{r, cache=TRUE}
+
 storm.data.url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
 download.file(storm.data.url, destfile = "StormData.csv.bz2", method = "curl")
 Sys.time() # Time of downloading data
-bunzip2(filename = "StormData.csv.bz2")
+bunzip2(filename = "StormData.csv.bz2", overwrite = TRUE)
 storm.data <- tbl_df(read.csv("StormData.csv", header=TRUE))
 ```
 
@@ -248,7 +256,7 @@ grouped.events <- nrow(storm.group)
 There are `r reported.events` events recorded in the data set, but after grouping, I see there are `r grouped.events`. If events were grouped by neighboring state, this figure would likely decrease even more.
 
 ### Results
-With the data throughly cleaned and tidyed, I begin the analysis by identifying the weather events that are the most hazardous to human health. It is done by summing the injuries and fatalities. In addition, I will count the number of events.
+With the data cleaned and tidyed, I begin the analysis by identifying the weather events that are the most hazardous to human health. It is done by summing the injuries and fatalities. In addition, I will count the number of events.
 
 ```{r}
 hazard.health <- storm.group %>%
@@ -299,3 +307,44 @@ head(most.cost, 5)
 ```
 
 Hurricanes and storm surges rank highest and are an order of magnitude greater in their total cost per event. Tropical storms add to the cost of extreme ocean storms. Tsunamis are also ranked high. Floods rank fifth, but are approximately 50 times more common than hurricanes, storm surge, and tropical storms. 
+
+#### Differences across states
+
+```{r}
+state.health <- storm.group %>%
+                group_by(state, event) %>%
+                summarize(total.fatalities = sum(all.fatalities),
+                          total.injuries = sum(all.injuries),
+                          count = n(),
+                          fatalities.per.event = round(total.fatalities/count, 1),
+                          injuries.per.event = round(total.injuries/count), 1)
+
+state.cost <- storm.group %>%
+                group_by(state, event) %>%
+                summarize(total.prop.dmg = sum(all.prop.dmg),
+                          total.crop.dmg = sum(all.crop.dmg),
+                          count = n(),
+                          prop.dmg.per.event = round(total.prop.dmg/count, 1),
+                          crop.dmg.per.event = round(total.crop.dmg/count, 1),
+                          total.cost.per.event = prop.dmg.per.event + crop.dmg.per.event)
+
+state.results <- cbind(state.abb, matrix(rep('', 150), ncol = 3))
+
+for (row in 1:nrow(state.results)) {
+        state.name <- as.character(state.results[row, 1])
+        temp.health <- filter(state.health, state == state.name)
+        temp.cost <- filter(state.cost, state == state.name)
+        max.fatal.index <- which.max(temp.health$fatalities.per.event)
+        max.injury.index <- which.max(temp.health$injuries.per.event)
+        max.cost.index <- which.max(temp.cost$total.cost.per.event)
+        state.results[row, 2] <- as.character(temp.health$event[[max.fatal.index]])
+        state.results[row, 3] <- as.character(temp.health$event[[max.injury.index]])
+        state.results[row, 4] <- as.character(temp.cost$event[[max.cost.index]])
+}
+
+state.results <- as.data.frame(state.results)
+names(state.results) <- c('state', 'fatalities.per.event', 'injuries.per.event', 
+                          'total.cost.per.event')
+```
+
+
