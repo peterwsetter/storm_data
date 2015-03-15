@@ -1,12 +1,6 @@
----
-title: "Hazardous Storms: Analysis of NOAA Storm Data"
-author: "Peter W Setter"
-date: "March 15, 2015"
-output:
-  html_document:
-    keep_md: yes
-    fig_caption: yes
----
+# Hazardous Storms: Analysis of NOAA Storm Data
+Peter W Setter  
+March 15, 2015  
 
 ### Synopsis
 I analyzed the National Oceanic and Atmospheric Association's Storm Database and created three metrics of hazard to humans: fatalities per event, injuries per event, and total property and crop damage per event. Using these metrics, I determined that by fatalities per event, tsunamis and excessive heat are the most hazardous; by injuries per event, tsunamis and hurricanes are the most hazardous; and by property and crop damage per event, hurricanes and storm surge are the most hazardous. An examination of state-by-state frequency of hurricanes and excessive heat events provided more detail for governmental managers in planning storm responses.
@@ -23,9 +17,62 @@ This analysis used a Macbook 2,1 running OSX 10.6.8 with a Intel Core 2 Duo proc
 ### Data Processing
 I begin by loading the packages necessary for the data processing and analysis. `R.utils` provides a function to unzip the data file. `dplyr` is used for data manipulation. `lubridata` provides functions for parsing time values. `stringr` provides functions for string searching and subsetting. `choroplethr` and `choroplethrMaps` will be used to create figures. `datasets` provide vectors of state names and abbreviations.
 
-```{r}
+
+```r
 library(R.utils)
+```
+
+```
+## Warning: package 'R.utils' was built under R version 3.1.3
+```
+
+```
+## Loading required package: R.oo
+## Loading required package: R.methodsS3
+## R.methodsS3 v1.7.0 (2015-02-19) successfully loaded. See ?R.methodsS3 for help.
+## R.oo v1.18.0 (2014-02-22) successfully loaded. See ?R.oo for help.
+## 
+## Attaching package: 'R.oo'
+## 
+## The following objects are masked from 'package:methods':
+## 
+##     getClasses, getMethods
+## 
+## The following objects are masked from 'package:base':
+## 
+##     attach, detach, gc, load, save
+## 
+## R.utils v2.0.0 (2015-02-28) successfully loaded. See ?R.utils for help.
+## 
+## Attaching package: 'R.utils'
+## 
+## The following object is masked from 'package:utils':
+## 
+##     timestamp
+## 
+## The following objects are masked from 'package:base':
+## 
+##     cat, commandArgs, getOption, inherits, isOpen, parse, warnings
+```
+
+```r
 library(dplyr)
+```
+
+```
+## 
+## Attaching package: 'dplyr'
+## 
+## The following object is masked from 'package:stats':
+## 
+##     filter
+## 
+## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union
+```
+
+```r
 library(lubridate)
 library(stringr)
 library(choroplethr)
@@ -37,11 +84,18 @@ The data used in this analysis is the U.S. National Oceanic and Atmospheric Admi
 
 I begin by downloading, unzipping, and reading the data. The data is immediately converted to a data frame tbl, the class used by `dplyr`.
 
-```{r, cache=TRUE}
 
+```r
 storm.data.url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
 download.file(storm.data.url, destfile = "StormData.csv.bz2", method = "curl")
 Sys.time() # Time of downloading data
+```
+
+```
+## [1] "2015-03-09 06:20:12 CDT"
+```
+
+```r
 bunzip2(filename = "StormData.csv.bz2", overwrite = TRUE)
 storm.data <- tbl_df(read.csv("StormData.csv", header=TRUE))
 ```
@@ -57,7 +111,8 @@ My next steps will involve cleaning and tidying. I'll start with several basic t
 
 The final step was performed because the data prior to this date is [more complete](https://class.coursera.org/repdata-012/forum/thread?thread_id=29#comment-28). Given the size of storm.data, it is removed in order to free up resources.
 
-```{r, cache = TRUE}
+
+```r
 storm.data2 <- storm.data %>%  
         mutate(event = tolower(EVTYPE), 
                date = mdy_hms(BGN_DATE),
@@ -75,8 +130,13 @@ rm(storm.data)
 
 Looking at `storm.data2` I see that there are many more events in the data set than the 48 mentioned in the [documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf). 
 
-```{r}
+
+```r
 length(unique(storm.data2$event))
+```
+
+```
+## [1] 438
 ```
 
 The next task will be to clean the data by combing factors so they fall within the permitted categories. If the listing is unknown or difficult to determine, it will be placed in the category `other`. `Combine.events` is a function that returns a permitted event name based on on an `event`. By coupling `any` with `str_detect`, we can look for abbreviations and misspellings, e.g. "tstm" for "thunderstorm" and "wnd" for "wind".
@@ -101,7 +161,8 @@ Overview on how labels were combined:
 
 With the function defined, I first create a data frame tbl called `storm.clean`. I utilize vapply to overwrite the `event` with each `event` properly classified. Please see this [StackOverflow post](http://stackoverflow.com/questions/9668456/why-does-sapply-return-a-list) for an explanation on the use of vapply. Last, the `event` column is transformed from `character`s into `factor`s.
 
-```{r, cache=TRUE}
+
+```r
 Combine.events <- function(event) {
         if(str_detect(event, 'marine')) {
                 if (any(str_detect(event, c('tstm', 'thunderstorm')))) {
@@ -242,14 +303,28 @@ storm.clean$event <- as.factor(storm.clean$event)
 
 If I examine the head of the data frame tbl, I notice that there are several entries that have the same `date`, `event`, and `state`. (Also, since storm.data2 is no longer needed, it is removed to free up space.)
 
-```{r}
+
+```r
 rm(storm.data2)
 head(storm.clean)
 ```
 
+```
+## Source: local data frame [6 x 7]
+## 
+##         date             event state fatalities injuries prop.dmg crop.dmg
+## 1 1996-01-06      winter.storm    AL          0        0   380000    38000
+## 2 1996-01-11           tornado    AL          0        0   100000        0
+## 3 1996-01-11 thunderstorm.wind    AL          0        0     3000        0
+## 4 1996-01-11 thunderstorm.wind    AL          0        0     5000        0
+## 5 1996-01-11 thunderstorm.wind    AL          0        0     2000        0
+## 6 1996-01-18              hail    AL          0        0        0        0
+```
+
 Large events can affect several parts of a state or multiple states. Each county or region may each file a separate report. To best understand each event, I can group the data by `date`, `event`, and `state`, and then report the the total property damage, the total crop damage, the total damage, total fatalities, and total injuries. I chose to group by state, because disaster relief is typically performed at the state level with potential federal support. The resulting data frame tbl is called `storm.group`.
 
-```{r}
+
+```r
 storm.group <- storm.clean %>% 
         group_by(date, event, state) %>% 
         summarize(all.fatalities = sum(fatalities),
@@ -262,12 +337,13 @@ reported.events <- nrow(storm.clean)
 grouped.events <- nrow(storm.group)
 ```
 
-There are `r reported.events` events recorded in the data set, but after grouping, I see there are `r grouped.events`. If events were grouped by neighboring state, this figure would likely decrease even more.
+There are 653530 events recorded in the data set, but after grouping, I see there are 158121. If events were grouped by neighboring state, this figure would likely decrease even more.
 
 ### Results
 With the data cleaned and tided, I begin the analysis by identifying the weather events that are the most hazardous to human health. It is done by summing the injuries and fatalities. In addition, I will count the number of events.
 
-```{r}
+
+```r
 hazard.health <- storm.group %>%
         group_by(event) %>%
         summarize(total.fatalities = sum(all.fatalities),
@@ -278,6 +354,19 @@ hazard.health <- storm.group %>%
         arrange(desc(fatalities.per.event))
 
 head(hazard.health, 5)
+```
+
+```
+## Source: local data frame [5 x 7]
+## 
+##               event total.fatalities total.injuries count
+## 1           tsunami               33            129    10
+## 2    excessive.heat             1799           6391  1547
+## 3       rip.current              542            503   659
+## 4 hurricane.typhoon              125           1328   175
+## 5         avalanche              223            156   361
+## Variables not shown: fatalities.per.event (dbl), injuries.per.event (dbl),
+##   1 (dbl)
 ```
 
 Looking at the events that cause the most loss of life, the top five are
@@ -292,15 +381,30 @@ I note that tsunamis were infrequent, only 10 recorded in the 11 years of the da
 
 I can arrange the table and consider the number of injuries per event.
 
-```{r}
+
+```r
 head(arrange(hazard.health, desc(injuries.per.event)), 5)
+```
+
+```
+## Source: local data frame [5 x 7]
+## 
+##               event total.fatalities total.injuries count
+## 1           tsunami               33            129    10
+## 2 hurricane.typhoon              125           1328   175
+## 3    excessive.heat             1799           6391  1547
+## 4           tornado             1511          20667  7114
+## 5              heat              237           1294   630
+## Variables not shown: fatalities.per.event (dbl), injuries.per.event (dbl),
+##   1 (dbl)
 ```
 
 As before, tsunamis have the greatest impact on human health, and heat, in its two designations, are placed similar to before. Under this metric, the effect of hurricanes and tornadoes are seen.
 
 Turning my attention to the damage caused by storms, I can perform an operation like that before. I create a new data frame tbl `most.cost`, which summarizes the total property, crop, and overall damage.
 
-```{r}
+
+```r
 most.cost <- storm.group %>%
         group_by(event) %>%
         summarize(total.prop.dmg = sum(all.prop.dmg),
@@ -315,12 +419,26 @@ most.cost <- storm.group %>%
 head(most.cost, 5)
 ```
 
+```
+## Source: local data frame [5 x 7]
+## 
+##               event total.cost.per.event count total.prop.dmg
+## 1 hurricane.typhoon            497537125   175    81718889010
+## 2       storm.surge            218427301   219    47834724000
+## 3    tropical.storm             29091561   286     7642475550
+## 4           tsunami             14408200    10      144062000
+## 5             flood             13781842 10850   144519820760
+## Variables not shown: total.crop.dmg (dbl), prop.dmg.per.event (dbl),
+##   crop.dmg.per.event (dbl)
+```
+
 Hurricanes and storm surges rank highest and are an order of magnitude greater in their total cost per event. Tropical storms add to the cost of extreme ocean storms. Tsunamis are also ranked high. Floods rank fifth, but are approximately 50 times more common than hurricanes, storm surge, and tropical storms. 
 
 #### Differences across states
 Hurricanes and excessive heat are two of most hazardous event types. It is of interest to examine the the frequency of these events across the states. In the code below, I group the data by state and event, and then determine an aggregate frequency. The resulting data frame tbl, `state.summary` is used by the function `Make.map` to construct a choropleth map. I first examine the frequency of excessive heat events.
 
-```{r}
+
+```r
 state.summary <- storm.group %>%
                 group_by(state, event) %>%
                 summarize(count = n())
@@ -339,14 +457,30 @@ Make.map <- function(event.name) {
 }
 ```
 
-```{r figure1, fig.cap="Figure 1. Count of Excessive Heat Events by State"}
+
+```r
 Make.map('excessive.heat')
 ```
 
+```
+## Warning in self$bind(): The following regions were missing and are being
+## set to NA: district of columbia
+```
+
+![Figure 1. Count of Excessive Heat Events by State](storm_analysis_files/figure-html/figure1-1.png) 
+
 Examining this choropleth of excessive heat frequency, it appears that excessive heat occurs in many regions of the country, with the highest frequencies in California, Texas, Oklahoma, Missouri, Alabama, Illinois, and Pennsylvania. 
 
-```{r figure2, fig.cap="Figure 2. Count of Hurricane Events by State"}
+
+```r
 Make.map('hurricane.typhoon')
 ```
+
+```
+## Warning in self$bind(): The following regions were missing and are being
+## set to NA: district of columbia
+```
+
+![Figure 2. Count of Hurricane Events by State](storm_analysis_files/figure-html/figure2-1.png) 
 
 Hurricanes and typhoons primarily affect the Southeast United States; however, they can impact states all along the East Coast.
